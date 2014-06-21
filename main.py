@@ -38,7 +38,7 @@ def tick(keys):
             tick_count = 0
             timer -= 1
             
-        if timer == 0:
+        if timer <= 0:
             enemy_tanks.extend(generate_tanks(tank_count, 600, 800, 0, 600))
             wave_started = True
             
@@ -74,6 +74,7 @@ def tick(keys):
     for mine in mines:
         camera.draw(mine)
     
+    kills = 0
     for tank in enemy_tanks:
         if (tank.y > king.y):
             if (tank.facing > 180 - 45):
@@ -91,12 +92,14 @@ def tick(keys):
         
         for boom in booms:
             if tank.touches(boom):
-                enemy_tanks.remove(tank)
-                
-                score += TANK_VALUE
-                cash += TANK_VALUE
+                if tank in enemy_tanks:
+                    enemy_tanks.remove(tank)
+                    kills += 1
+                    
+    cash += int(TANK_VALUE * (kills**2))
     
     for etank in enemy_tanks:
+
         etank.forward() 
         etank.tick()
         
@@ -117,31 +120,57 @@ def tick(keys):
         
     # Buttons
     if camera.mouseclick:
+        
         if button_state_machine.has_state():
             s = button_state_machine.state
             mx, my = camera.mousex, camera.mousey
-            if s == "BARRIERS":
+            if s == "BARRIER":
                 if cash >= tankstuff.Barrier.price:
                     cash -= tankstuff.Barrier.price
                     barriers.append(tankstuff.Barrier(mx, my, 2, 4))
             elif s == "TURRET":
                 pass
-            elif s == "MINES":
+            elif s == "MINE":
+                # Mine cannot be place touching another mine
                 if cash >= tankstuff.Mine.price:
-                    cash -= tankstuff.Mine.price
-                    mines.append(tankstuff.Mine(mx, my))
+                    new_mine = tankstuff.Mine(mx, my)
+                    touching = False
+                    for mine in mines:
+                        if new_mine.touches(mine):
+                            touching = True
+                            break
+                    if not touching:
+                        cash -= tankstuff.Mine.price
+                        mines.append(new_mine)
                     
             print(button_state_machine.state)
             button_state_machine.clear_state()
+        
         else:
             for b in buttons:
+                
                 if b.clicked(camera):
-                    button_state_machine.set_state(b.text)
+                    if b.text == "START":
+                        if timer > 0 and not wave_started:
+                            timer = 0
+                    else:
+                        button_state_machine.set_state(b.text)
+    
+    if not button_state_machine.has_state():
+        if pygame.K_m in keys:
+            button_state_machine.set_state("MINE")
+            
+        elif pygame.K_b in keys:
+            button_state_machine.set_state("BARRIER")
+            
+        elif pygame.K_k in keys:
+            button_state_machine.set_state("TURRET")
     
     # Wave Compleated
     if len(enemy_tanks) == 0 and wave_started:
         wave += 1
         tank_count += 1
+        score += cash
         timer = PRE_WAVE_TIME
         wave_started = False
     
@@ -208,9 +237,10 @@ barriers.append(tankstuff.Barrier(150, 150, 5, 30))
 mines.append(tankstuff.Mine(400, 300))
 
 # BUTTONS 
-buttons.append(tankstuff.Button(25, 575,color = "grey", text_color = "black", text = "MINES"))
-buttons.append(tankstuff.Button(75, 575, text = "TURRETS"))
-buttons.append(tankstuff.Button(125, 575,color = "grey", text_color = "black", text = "BARRIERS"))
+buttons.append(tankstuff.Button(25, 575,color = "grey", text_color = "black", text = "MINE"))
+buttons.append(tankstuff.Button(75, 575, text = "TURRET"))
+buttons.append(tankstuff.Button(125, 575,color = "grey", text_color = "black", text = "BARRIER"))
+buttons.append(tankstuff.Button(175,575,color = "green", text_color = "black", text = "START"))
 
 # THINGS
 king = gamebox.from_color(100, 300, "yellow", 25, 25)
